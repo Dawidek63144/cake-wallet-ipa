@@ -51,7 +51,7 @@ jobs:
           set -x
           bash scripts/prepare_torch.sh
 
-      - name: Prepare reown z tarball (generate_all pada na Flutter 3.41: freezed vs dependency_validator)
+      - name: "Prepare reown z tarball (generate_all pada na Flutter 3.41)"
         run: |
           set -x
           pushd scripts
