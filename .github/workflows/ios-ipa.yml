@@ -29,17 +29,19 @@ jobs:
         run: |
           set -e -x
           export PATH="$HOME/.cargo/bin:$PATH"
+          chmod +x scripts/*.sh scripts/ios/*.sh ./model_generator.sh ./compile_graphics.sh ./gen_android_manifest.sh 2>/dev/null || true
+          find scripts -name "*.sh" -exec chmod +x {} \;
           cd scripts/ios
           source ./app_env.sh cakewallet
           export APP_IOS_BUNDLE_ID="com.test.cakewallet"
-          ./app_config.sh
+          bash ./app_config.sh
           cd ../../
           # gotowe biblioteki Monero zamiast 4h kompilacji:
           dart run tool/download_moneroc_prebuilds.dart
           flutter pub get
           dart run tool/generate_new_secrets.dart
           dart run tool/generate_localization.dart
-          ./model_generator.sh
+          bash ./model_generator.sh
           flutter build ios --release --no-codesign
           cd build/ios/iphoneos
           mkdir Payload && cp -r Runner.app Payload/
