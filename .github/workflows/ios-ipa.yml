@@ -31,13 +31,23 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           chmod +x scripts/*.sh scripts/ios/*.sh ./model_generator.sh ./compile_graphics.sh ./gen_android_manifest.sh 2>/dev/null || true
           find scripts -name "*.sh" -exec chmod +x {} \;
+          # 1. paczki path (gitignore je usuwa, trzeba pobrać przed pub get):
+          bash scripts/prepare_torch.sh
+          bash scripts/prepare_reown.sh
+          bash scripts/build_bitbox_flutter.sh
+          # 2. konfiguracja aplikacji:
           cd scripts/ios
           source ./app_env.sh cakewallet
           export APP_IOS_BUNDLE_ID="com.test.cakewallet"
           bash ./app_config.sh
           cd ../../
-          # gotowe biblioteki Monero zamiast 4h kompilacji:
-          dart run tool/download_moneroc_prebuilds.dart
+          # 3. natywne biblioteki iOS (oficjalna ścieżka z docs/builds/IOS.md):
+          bash scripts/ios/build_torch.sh
+          bash scripts/ios/build_monero_all.sh
+          bash scripts/ios/build_mwebd.sh
+          bash scripts/ios/build_decred.sh
+          bash scripts/ios/build_zcash.sh
+          # 4. flutter:
           flutter pub get
           dart run tool/generate_new_secrets.dart
           dart run tool/generate_localization.dart
