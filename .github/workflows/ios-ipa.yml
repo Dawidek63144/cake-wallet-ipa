@@ -68,7 +68,10 @@ jobs:
       - name: Build bitbox bindings (path dep, MUSI być przed pub get)
         run: |
           set -x
-          export PATH="$HOME/.cargo/bin:$PATH"
+          export PATH="$HOME/.cargo/bin:$PATH:$HOME/go/bin:$(go env GOPATH)/bin"
+          go version
+          go install golang.org/x/mobile/cmd/gomobile@latest
+          gomobile init
           bash scripts/build_bitbox_flutter.sh
 
       - name: App env + config (JEDEN step, source musi być w tym samym shellu)
