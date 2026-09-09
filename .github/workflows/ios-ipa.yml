@@ -72,7 +72,8 @@ jobs:
           go version
           go install golang.org/x/mobile/cmd/gomobile@latest
           gomobile init
-          bash scripts/build_bitbox_flutter.sh
+          cd scripts
+          bash ./build_bitbox_flutter.sh
 
       - name: App env + config (JEDEN step, source musi być w tym samym shellu)
         run: |
@@ -91,13 +92,15 @@ jobs:
       - name: Build monero/wownero/zano (najdłuższe, 2-4h)
         run: |
           set -x
-          bash scripts/ios/build_monero_all.sh
+          cd scripts/ios
+          bash ./build_monero_all.sh
 
       - name: Build mwebd
         run: |
           set -x
           export PATH=$PATH:~/go/bin
-          bash scripts/ios/build_mwebd.sh
+          cd scripts/ios
+          bash ./build_mwebd.sh
 
       - name: Build decred
         run: |
