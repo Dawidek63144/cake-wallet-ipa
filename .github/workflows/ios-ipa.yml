@@ -33,7 +33,14 @@ jobs:
           find scripts -name "*.sh" -exec chmod +x {} \;
           # 1. paczki path (gitignore je usuwa, trzeba pobrać przed pub get):
           bash scripts/prepare_torch.sh
-          bash scripts/prepare_reown.sh
+          # reown: tarball zamiast git+generate (generate pada na Flutter 3.41.9: freezed vs dependency_validator):
+          pushd scripts
+            rm -rf reown_flutter reown_flutter.tar.gz
+            curl -L https://github.com/cake-tech/reown_flutter/releases/download/v0.0.4/reown_flutter-v0.0.4.tar.gz -o reown_flutter.tar.gz
+            mkdir reown_flutter
+            tar -xzf reown_flutter.tar.gz -C reown_flutter
+            rm ./reown_flutter.tar.gz
+          popd
           bash scripts/build_bitbox_flutter.sh
           # 2. konfiguracja aplikacji:
           cd scripts/ios
