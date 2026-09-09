@@ -7,65 +7,131 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 360
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout (full, with tags for gen_framework)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: true
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter 3.41.9 (jak oficjalne CI)
+        uses: subosito/flutter-action@v2
         with:
           flutter-version: '3.41.9'
           channel: 'stable'
           cache: true
 
-      - name: Setup Xcode + deps
+      - name: Git config + chmod
         run: |
-          brew install automake ccache cmake cocoapods go libtool pkgconfig xz
+          set -x
+          git config --global --add safe.directory '*'
+          git config --global user.email "ci@cakewallet.com"
+          git config --global user.name "CakeWallet CI"
+          find scripts -name "*.sh" -exec chmod +x {} \;
+          chmod +x ./model_generator.sh ./compile_graphics.sh ./gen_android_manifest.sh 2>/dev/null || true
+
+      - name: Setup Xcode + deps + Rust + Go
+        run: |
+          set -x
+          brew install automake ccache cmake cocoapods go libtool pkgconfig xz || brew upgrade automake ccache cmake cocoapods go libtool pkgconfig xz || true
+          sudo softwareupdate --install-rosetta --agree-to-license || true
           sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
           sudo xcodebuild -runFirstLaunch || true
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          flutter --version
-          pod --version
-
-      - name: Configure + build IPA (Cake Wallet)
-        run: |
-          set -e -x
+          xcodebuild -downloadPlatform iOS || true
+          xcrun --sdk iphoneos --show-sdk-path
+          xcrun --sdk iphonesimulator --show-sdk-path
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable --profile minimal || true
           export PATH="$HOME/.cargo/bin:$PATH"
-          chmod +x scripts/*.sh scripts/ios/*.sh ./model_generator.sh ./compile_graphics.sh ./gen_android_manifest.sh 2>/dev/null || true
-          find scripts -name "*.sh" -exec chmod +x {} \;
-          # 1. paczki path (gitignore je usuwa, trzeba pobrać przed pub get):
+          rustup update || true
+          rustup target add aarch64-apple-ios aarch64-apple-ios-simulator aarch64-apple-darwin x86_64-apple-darwin x86_64-apple-ios-simulator || true
+          rustc --version; cargo --version; go version; pod --version; flutter --version
+          flutter doctor -v || true
+
+      - name: Prepare torch source (MUSI być przed pub get, path dep)
+        run: |
+          set -x
           bash scripts/prepare_torch.sh
-          # reown: tarball zamiast git+generate (generate pada na Flutter 3.41.9: freezed vs dependency_validator):
+
+      - name: Prepare reown z tarball (generate_all pada na Flutter 3.41: freezed vs dependency_validator)
+        run: |
+          set -x
           pushd scripts
             rm -rf reown_flutter reown_flutter.tar.gz
-            curl -L https://github.com/cake-tech/reown_flutter/releases/download/v0.0.4/reown_flutter-v0.0.4.tar.gz -o reown_flutter.tar.gz
+            for i in 1 2 3; do
+              curl -L https://github.com/cake-tech/reown_flutter/releases/download/v0.0.4/reown_flutter-v0.0.4.tar.gz -o reown_flutter.tar.gz && break || sleep 15
+            done
             mkdir reown_flutter
             tar -xzf reown_flutter.tar.gz -C reown_flutter
             rm ./reown_flutter.tar.gz
+            ls reown_flutter/packages/reown_walletkit || exit 1
           popd
+
+      - name: Build bitbox bindings (path dep, MUSI być przed pub get)
+        run: |
+          set -x
+          export PATH="$HOME/.cargo/bin:$PATH"
           bash scripts/build_bitbox_flutter.sh
-          # 2. konfiguracja aplikacji:
+
+      - name: App env + config (JEDEN step, source musi być w tym samym shellu)
+        run: |
+          set -x
           cd scripts/ios
           source ./app_env.sh cakewallet
           export APP_IOS_BUNDLE_ID="com.test.cakewallet"
           bash ./app_config.sh
-          cd ../../
-          # 3. natywne biblioteki iOS (oficjalna ścieżka z docs/builds/IOS.md):
-          bash scripts/ios/build_torch.sh
+
+      - name: Build torch xcframework
+        run: |
+          set -x
+          cd scripts/torch_dart
+          ./build.sh aarch64-apple-ios-simulator aarch64-apple-ios aarch64-apple-darwin x86_64-apple-darwin
+
+      - name: Build monero/wownero/zano (najdłuższe, 2-4h)
+        run: |
+          set -x
           bash scripts/ios/build_monero_all.sh
+
+      - name: Build mwebd
+        run: |
+          set -x
+          export PATH=$PATH:~/go/bin
           bash scripts/ios/build_mwebd.sh
-          bash scripts/ios/build_decred.sh
+
+      - name: Build decred
+        run: |
+          set -x
+          export PATH=$PATH:~/go/bin
+          cd scripts/ios
+          bash ./build_decred.sh
+
+      - name: Build zcash
+        run: |
+          set -x
+          export PATH="$HOME/.cargo/bin:$PATH"
           bash scripts/ios/build_zcash.sh
-          # 4. flutter:
+
+      - name: Flutter finalize (pubspec już po configure, sekrety placeholder)
+        run: |
+          set -x
+          export PATH="$HOME/.cargo/bin:$PATH"
           flutter pub get
           dart run tool/generate_new_secrets.dart
           dart run tool/generate_localization.dart
           bash ./model_generator.sh
+          bash ./compile_graphics.sh || echo "compile_graphics skip/ok"
+
+      - name: Build IPA (no-codesign do sideloadu)
+        run: |
+          set -x
           flutter build ios --release --no-codesign
           cd build/ios/iphoneos
+          rm -rf Payload CakeWallet.ipa
           mkdir Payload && cp -r Runner.app Payload/
           zip -r CakeWallet.ipa Payload
           ls -lh CakeWallet.ipa
 
-      - uses: actions/upload-artifact@v4
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
         with:
           name: CakeWallet-ipa
           path: build/ios/iphoneos/CakeWallet.ipa
+          if-no-files-found: error
