@@ -85,7 +85,7 @@ jobs:
         run: |
           set -euxo pipefail
           find scripts -type f -name '*.sh' -exec chmod +x {} +
-          chmod +x model_generator.sh compile_graphics.sh gen_android_manifest.sh
+          chmod +x model_generator.sh compile_graphics.sh
 
       - name: Prepare path dependencies
         run: |
