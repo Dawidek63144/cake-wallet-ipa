@@ -62,7 +62,7 @@ jobs:
           export PATH="$HOME/.cargo/bin:$PATH"
           rustup target add \
             aarch64-apple-ios \
-            aarch64-apple-ios-simulator \
+            aarch64-apple-ios-sim \
             aarch64-apple-darwin \
             x86_64-apple-darwin \
             x86_64-apple-ios-simulator
