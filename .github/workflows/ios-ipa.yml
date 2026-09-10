@@ -45,6 +45,9 @@ jobs:
       - name: Set up build tools
         run: |
           set -euxo pipefail
+          if ! arch -x86_64 /usr/bin/true; then
+            sudo softwareupdate --install-rosetta --agree-to-license
+          fi
           brew install automake ccache cmake cocoapods go libtool pkg-config xz
           sudo xcode-select --switch /Applications/Xcode.app/Contents/Developer
           sudo xcodebuild -runFirstLaunch
