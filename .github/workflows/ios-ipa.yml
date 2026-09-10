@@ -113,10 +113,13 @@ jobs:
           popd
 
       - name: Build native iOS libraries
+        env:
+          APP_VARIANT: ${{ inputs.app_variant }}
         run: |
           set -euxo pipefail
           export PATH="$HOME/.cargo/bin:$HOME/go/bin:$PATH"
           pushd scripts/ios
+          source ./app_env.sh "$APP_VARIANT"
           bash ./build_all.sh
           popd
           bash scripts/ios/build_zcash.sh
